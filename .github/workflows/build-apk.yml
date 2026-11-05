@@ -1,0 +1,37 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+    paths: ['index.html', '.github/workflows/build-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build Android project
+        run: |
+          mkdir www && cp index.html www/
+          npm init -y
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init 'Phone App Builder' com.redcreep.appbuilder --web-dir=www
+          npx cap add android
+          npx cap sync android
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk phone-app-builder.apk
+          gh release create 'v0.1.${{ github.run_number }}' phone-app-builder.apk --title 'Phone App Builder build ${{ github.run_number }}' --notes 'Debug APK. Allow installs from this source to install it.'
